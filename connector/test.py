@@ -16,10 +16,7 @@ async def main():
     scp.onError(lambda message: print(f"SCP Error: {message}"))
 
     try:
-        # context = await scp.connect("wss://gimli4.node.secretarium.org:9430", key)
-        # context = await scp.connect("wss://gimli4.node.secretarium.org:5001", key)
         await scp.connect("wss://klave-dev.secretarium.org", key)
-        # await scp.connect("wss://gimli4.node.secretarium.org:20000", key)
         tx = scp.newTx("wasm-manager", "version", None, '{}')
         
         print(f"TEST: Registering listeners")
