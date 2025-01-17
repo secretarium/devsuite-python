@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secretarium-connector"
+description = "This package provides a Python connector to the Secretarium platform."
+license = { text = "MIT" }
+dependencies = [
+    'cryptography',
+    'websockets',
+    'asn1crypto'
+]
+requires-python = ">= 3.9"
+authors = [
+  {email = "python@secretarium.org"},
+]
+maintainers = [
+  {name = "Florian Guitton", email = "florian@secretarium.org"}
+]
+keywords = ["Secretarium", "Connector", "Honest Computing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+readme = "README.md"
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://secretarium.com"
+
+[tool.setuptools.packages.find]
+exclude = ["tests", "typings", "dist"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+    "integration",
+]
+asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"

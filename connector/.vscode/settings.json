@@ -1,0 +1,6 @@
+{
+    "python.analysis.fixAll": [
+        "source.unusedImports",
+        "source.convertImportFormat"
+    ]
+}

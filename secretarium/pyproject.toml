@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secretarium"
+description = "This package name is reserved by Secretarium Ltd"
+license = { text = "MIT" }
+dependencies = []
+requires-python = ">= 3.9"
+authors = [
+  {email = "python@secretarium.org"},
+]
+maintainers = [
+  {name = "Florian Guitton", email = "florian@secretarium.org"}
+]
+keywords = ["Secretarium", "Connector", "Honest Computing"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+readme = "README.md"
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://secretarium.com/python"
