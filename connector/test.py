@@ -18,7 +18,7 @@ async def main():
     try:
         await scp.connect("wss://klave-dev.secretarium.org", key)
         tx = scp.newTx("wasm-manager", "version", None, '{}')
-        
+
         print(f"TEST: Registering listeners")
         tx.onError(lambda message: print(f"LMB Error: {message}"))
         tx.onExecuted(lambda: print(f"LMB Executed 1: Should not show"))

@@ -3,7 +3,7 @@ import asyncio
 import json
 import logging
 import base64
-from . import utils as Utils, key   
+from . import utils as Utils, key
 from asn1crypto.core import Sequence
 from typing import Self, Callable, Dict, List, Any, Optional, Union
 from logging import Logger
@@ -52,7 +52,6 @@ class TransactionNotificationHandlers:
     onAcknowledged: List[Callable[[str], None]]
     onCommitted: List[Callable[[str], None]]
     onExecuted: List[Callable[[str], None]]
-    onProposed: List[Callable[[str], None]]
     promise: asyncio.Future[Any]
     failed: bool = False
 
@@ -81,7 +80,7 @@ class SCP:
 
     def isConnected(self):
         return self._connectionState == websocket_protocol.State.OPEN
-    
+
     def getEndpoint(self):
         return self._endpoint
 
@@ -112,7 +111,7 @@ class SCP:
         iv = Utils.increment_by(self._session.iv, data[0:16])[0:12]
         aesgcm: AESGCM = self._session.cryptoKey
         return aesgcm.decrypt(iv, data[16:], None)
-    
+
     async def _performClusterNegotiation(self, userKey: Key):
 
         if self._socket is None:
@@ -122,7 +121,7 @@ class SCP:
 
         ecdh = ec.generate_private_key(ec.SECP256R1())
         ecdhPubKeyRaw = ecdh.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)[1:]
-        
+
         await self._socket.send(bytes([0, 0, 0, 1]) + ecdhPubKeyRaw, False)
 
         serverHello = await asyncio.wait_for(self._socket.recv(decode=False), timeout=self._options.connectTimeout)
@@ -131,7 +130,7 @@ class SCP:
         serverHello = serverHello[4:]
 
         pow = self._computeProofOfWork(bytes(serverHello[0:32]))
-        
+
         trustedKey = base64.b64decode(self._endpoint.knownTrustedKey)
         clientProofOfWork = pow + trustedKey
 
@@ -145,7 +144,7 @@ class SCP:
 
         serverEcdhPubKey = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), bytes([4]) + serverIdentity[32:96])
         serverEcdsaPubKey = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), bytes([4]) + serverIdentity[-64:])
-            
+
         commonSecret = ecdh.exchange(ec.ECDH(), serverEcdhPubKey)
         hash = hashes.Hash(hashes.SHA256())
         hash.update(commonSecret)
@@ -166,7 +165,7 @@ class SCP:
 
         sequence: Any = Sequence.load(encoded_data=signedNonceDER, strict=False) # type: ignore
         r, s = sequence[0].native, sequence[1].native
-        
+
         r_bytes: bytes = r.to_bytes((r.bit_length() + 7) // 8, 'big')
         s_bytes: bytes = s.to_bytes((s.bit_length() + 7) // 8, 'big')
         curve_size = cryptoKeyPair.curve.key_size // 8
@@ -196,7 +195,7 @@ class SCP:
 
         serverSignedHashDER = encode_dss_signature(rr, rs)
         serverEcdsaPubKey.verify(serverSignedHashDER, toVerify, ec.ECDSA(hashes.SHA256()))
-        
+
         self._updateState(websocket_protocol.State.OPEN)
         asyncio.create_task(self._onMessage())
 
@@ -236,7 +235,7 @@ class SCP:
             except Exception as e:
                 if not isinstance(e, asyncio.TimeoutError):
                     raise e
-            
+
             if protocol is None:
                 await self._performClusterNegotiation(userKey)
             else:
@@ -308,25 +307,23 @@ class SCP:
                     if not x.promise.done():
                         x.promise.set_result(o["result"])
                 elif "state" in o:
-                    if "acknowledged" in o["state"]:
-                        for cb in x.onAcknowledged:
-                            cb(o["requestId"])
-                    if "proposed" in o["state"]:
-                        for cb in x.onProposed:
-                            cb(o["requestId"])
-                    if "committed" in o["state"]:
-                        for cb in x.onCommitted:
-                            cb(o["requestId"])
-                    if "executed" in o["state"]:
-                        for cb in x.onExecuted:
-                            cb(o["requestId"])
-                    if "failed" in o["state"]:
-                        x.failed = True
-                        for cb in x.onError:
-                            cb("Transaction Failed", o["requestId"])
-                        if not x.promise.done():
-                            x.promise.set_exception(o["error"])
-                        
+                    match o["state"].lower():
+                        case "acknowledged":
+                            for cb in x.onAcknowledged:
+                                cb(o["requestId"], None)
+                        case "committed":
+                            for cb in x.onCommitted:
+                                cb(o["requestId"], None)
+                        case "executed":
+                            for cb in x.onExecuted:
+                                cb(o["requestId"], None)
+                        case "failed":
+                            x.failed = True
+                            for cb in x.onError:
+                                cb("Transaction Failed", o["requestId"])
+                            if not x.promise.done():
+                                x.promise.set_exception(o["error"])
+
         except Exception as e:
             if self._onError is not None:
                 self._onError(f"Error while notifying: {e.__class__.__name__}: {e}")
@@ -356,7 +353,7 @@ class SCP:
                 "args": args
             })
 
-            if self._socket is not None:     
+            if self._socket is not None:
                 await self._socket.send(bytes([0, 0, 0, 1]) + encrypted, False)
 
         except Exception as e:
@@ -380,15 +377,15 @@ class Tx:
         self.requestId = requestId
         self.args = args
         self.promise = asyncio.Future[Any]()
-        self.cbs = TransactionNotificationHandlers([], [], [], [], [], [], self.promise)
+        self.cbs = TransactionNotificationHandlers([], [], [], [], [], self.promise)
         self.cbs.onResult.append(lambda message, r: self.promise.set_result(message))
 
     def _wrapper(self, callback: Callable[[Any, str], None] | Callable[[Any], None]| Callable[[], None]) -> Callable[..., Any]:
-        def _innerWrapper(d: Any, r: str) -> None:
+        def _innerWrapper(d: Any | None, r: str | None) -> None:
             if callable(callback):
-                if len(callback.__code__.co_varnames) == 0: 
+                if len(callback.__code__.co_varnames) == 0:
                     return callback() # type: ignore
-                elif len(callback.__code__.co_varnames) == 1: 
+                elif len(callback.__code__.co_varnames) == 1:
                     return callback(d) # type: ignore
                 else :
                     return callback(d, r) # type: ignore
@@ -397,23 +394,19 @@ class Tx:
     def onError(self, callback: Callable[[Any, str], None] | Callable[[Any], None]):
         self.cbs.onError.append(self._wrapper(callback))
         return self
-    
+
     def onResult(self, callback: Callable[[Any, str], None] | Callable[[Any], None]):
         self.cbs.onResult.append(self._wrapper(callback))
         return self
-    
+
     def onAcknowledged(self, callback: Callable[[str], None] | Callable[[], None]):
         self.cbs.onAcknowledged.append(self._wrapper(callback))
         return self
-    
-    def onProposed(self, callback: Callable[[str], None] | Callable[[], None]):
-        self.cbs.onProposed.append(self._wrapper(callback))
-        return self
-    
+
     def onCommitted(self, callback: Callable[[str], None] | Callable[[], None]):
         self.cbs.onCommitted.append(self._wrapper(callback))
         return self
-    
+
     def onExecuted(self, callback: Callable[[str], None] | Callable[[], None]):
         self.cbs.onExecuted.append(self._wrapper(callback))
         return self
